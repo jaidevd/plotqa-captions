@@ -1,5 +1,4 @@
 import os
-from PIL import Image
 import re
 import random
 from pydoc import locate
@@ -113,19 +112,6 @@ def match_and_generate(qs, answer, pattern, header, tmpl_opts):
     else:
         raise ValueError(f"Invalid caption template {tmpl_opts}.")
     return Template(tmpl).generate(answer=answer, **matches).decode()
-
-
-class PlotQA(object):
-    def __init__(self, root):
-        self.root = root
-
-    def load_qa(self, by="chart-id"):
-        pass
-
-    def show(self, chart_id):
-        path = op.join(self.root, "png", f"{chart_id}.png")
-        with Image.open(path) as im:
-            im.show()
 
 
 if __name__ == "__main__":

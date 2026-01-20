@@ -86,7 +86,7 @@ Then, the right template can be found as follows:
 >>> with open("qa_templates.yaml", "r") as fin:
 ...     tmpl_cfg = pd.DataFrame.from_records(yaml.safe_load(fin), index="id")
 ...     templates = tmpl_cfg['regex'].reset_index().to_dict(orient='records')
->>> matched_template = search_templates(tmpl_cfg, **qa_sample)
+>>> matched_template = search_templates(templates, **qa_sample)
 >>> print(matched_template)
 {'question_id': 2,
  'template_id': 2,
