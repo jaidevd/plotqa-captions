@@ -1,5 +1,4 @@
 import os
-from PIL import Image
 import re
 import random
 from pydoc import locate
@@ -9,9 +8,6 @@ import pandas as pd
 import warnings
 
 op = os.path
-
-with open("qa_templates.yaml", "r") as fin:
-    tmpl_cfg = pd.DataFrame.from_records(yaml.safe_load(fin), index="id")
 
 
 def search_templates(tmpls, question_id, question_string, **kwargs):
@@ -47,96 +43,56 @@ def search_templates(tmpls, question_id, question_string, **kwargs):
     }
 
 
-def generate_caption(header, caption, answer, **kwargs):
-    tmpl = header
+def generate_caption(qa, template):
+    """Generate a caption given a template and a QA object.
+
+    Parameters
+    ----------
+    qa : dict
+        A dictionary containing the question id, the question string, the
+        answer, the template ID and the regex matches.
+    template : dict
+        A dictionary containing the template information, including the header,
+        the caption f-strings and the original regex. This is one of the records
+        from `qa_templates.yaml`; and should have the same ID as that matched in `qa`.
+    """
+    tmpl = template['template_header']
+    caption = template['caption_templates']
     if isinstance(caption, list):
         tmpl += random.choice(caption)
     elif isinstance(caption, str):
         func = locate(caption)
         if callable(func):
-            tmpl += func(answer)
+            tmpl += func(qa['answer'])
         else:
             tmpl += caption
     else:
         raise ValueError(f"Invalid caption template {caption}.")
+    generated = Template(
+        tmpl, autoescape=None
+    ).generate(answer=qa['answer'], **qa['matches']).decode()
 
-    return Template(tmpl, autoescape=None).generate(answer=answer, **kwargs).decode()
-
-
-def caption_qa(question_id, template_id, answer, matches, **kwargs):
-    """Generate a caption given a QA pair and regex matches.
-
-    Parameters
-    ----------
-    question_id : int
-        question_id of the question string - for backreference.
-    template_id : int
-        ID of the template that matches the question string.
-    answer : any
-        answer to the question string
-    matches : dict
-        Regex groupdict containing the matches.
-    """
-    if answer is None:
-        return {"question_id": question_id, "template_id": template_id, "caption": ""}
-    tmpl = tmpl_cfg.loc[template_id]
-    header = tmpl["template_header"]
-    caption = tmpl["caption_templates"]
-    try:
-        if len(matches):
-            out = generate_caption(header, caption, answer, **matches)
-        else:
-            out = ""
-    except Exception as exc:
-        print(f"Failed for tid: {template_id} qid: {question_id}")
-        print(caption)
-        print(matches)
-        raise exc
-    return {"question_id": question_id, "template_id": template_id, "caption": out}
-
-
-def match_and_generate(qs, answer, pattern, header, tmpl_opts):
-    matches = re.search(pattern, qs)
-    if matches:
-        matches = matches.groupdict()
-    else:
-        return ""
-    tmpl = header
-    if isinstance(tmpl_opts, list):
-        tmpl += random.choice(tmpl_opts)
-    elif isinstance(tmpl_opts, str):
-        func = locate(tmpl_opts)
-        if callable(func):
-            tmpl += func(answer)
-        else:
-            tmpl += tmpl_opts
-    else:
-        raise ValueError(f"Invalid caption template {tmpl_opts}.")
-    return Template(tmpl).generate(answer=answer, **matches).decode()
-
-
-class PlotQA(object):
-    def __init__(self, root):
-        self.root = root
-
-    def load_qa(self, by="chart-id"):
-        pass
-
-    def show(self, chart_id):
-        path = op.join(self.root, "png", f"{chart_id}.png")
-        with Image.open(path) as im:
-            im.show()
+    return {'qid': qa['question_id'], 'caption': generated}
 
 
 if __name__ == "__main__":
-    import json
     from joblib import Parallel, delayed
+    from glob import glob
+    from tqdm import tqdm
 
-    FILE = "/media/jaidevd/motherbox/archive/plotqa/qa_pairs_V2.json"
-    with open(FILE, "r") as fin:
-        df = pd.DataFrame.from_records(json.load(fin)["qa_pairs"])
-        df = df[["question_id", "question_string"]].to_dict(orient="records")
-    tmpls = tmpl_cfg[["regex"]].reset_index().to_dict(orient="records")
-    matches = Parallel(n_jobs=-1, verbose=2)(
-        delayed(lambda x: search_templates(tmpls, **x))(x) for x in df
-    )
+    with open("qa_templates.yaml", "r") as fin:
+        tmpl_cfg = pd.DataFrame.from_records(yaml.safe_load(fin), index="id")
+
+    for i, file in tqdm(enumerate(glob('data/parts/*_matched_qa.jsonl'))):
+        outfile = f"data/parts/{i}_captions.jsonl"
+        df = pd.read_json(file, lines=True)
+        df.dropna(subset=['template_id', 'answer'], inplace=True)
+        templates = tmpl_cfg.loc[df['template_id']]
+        captions = Parallel(n_jobs=-1, verbose=2)(
+            delayed(generate_caption)(qa, tmpl) for (_, qa), (_, tmpl) in zip(
+                df.iterrows(), templates.iterrows()
+            )
+        )
+        pd.DataFrame.from_records(captions).to_json(
+            outfile, lines=True, orient="records"
+        )

@@ -17,6 +17,31 @@ This QA pair can be presented as a sentence, as follows:
 Across years, the maximum percentage of male population who survived till the
 age of 65  is 82.0172.
 
+# Preparing the dataset
+
+**Note**: We use json-lines almost exclusively. It's easier to use tools like
+grep and sed that way.
+
+## Generating Captions
+
+* Preprocessing
+  - Start with PlotQA, which contains three splits - train, validation and test. Each split has three files - a tarball of pngs, an annotations file, and another JSON containing QA pairs.
+  - Read the JSON file into a pandas dataframe, it should have these columns: `['image_index', 'qid', 'question_string', 'answer_bbox', 'template', 'answer', 'answer_id', 'type', 'question_id']`
+  - Remove the QA pairs corresponding to the "structural" template, i.e. `df = df[df['template'] != "structural"]`
+  - Some structural questions are not marked as such. Use `remove_structural_qs.sed` to remove them
+
+* Finding templates for each question string
+  - Load the question templates from `qa_templates.yaml`. Each template has an
+    ID.
+  - Use `plotqa.search_templates` to match a question string to a template.
+    Thus, map a question ID to a template ID. In addition, extract the name
+    regular expression groups from the question string.
+
+* Generating captions
+  - Use `plotqa.generate_caption` to generate a caption for each QA pair, using the
+    matched template and the extracted regex groups. Refer to the docstring of
+    that function for more.
+
 
 ## Question templates
 
@@ -86,7 +111,7 @@ Then, the right template can be found as follows:
 >>> with open("qa_templates.yaml", "r") as fin:
 ...     tmpl_cfg = pd.DataFrame.from_records(yaml.safe_load(fin), index="id")
 ...     templates = tmpl_cfg['regex'].reset_index().to_dict(orient='records')
->>> matched_template = search_templates(tmpl_cfg, **qa_sample)
+>>> matched_template = search_templates(templates, **qa_sample)
 >>> print(matched_template)
 {'question_id': 2,
  'template_id': 2,
