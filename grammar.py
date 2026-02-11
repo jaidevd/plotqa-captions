@@ -1,7 +1,8 @@
 """Utilities to fix grammatical errors in captions. Grammar checks are done with LanguageTool."""
+
 import json
 from collections import Counter
-from requests import get
+from requests import post, get
 import gc
 import re
 from joblib import Parallel, delayed
@@ -32,10 +33,13 @@ def process_from_mongo(query=None):
         query = {}
     with MongoClient() as client:
         db = client.plotqa
-        for batch in tqdm(db.val_captions.find_raw_batches(query, batch_size=1_000_000)):
+        for batch in tqdm(
+            db.val_captions.find_raw_batches(query, batch_size=1_000_000)
+        ):
             docs = bson.decode_all(batch)
             res = Parallel(n_jobs=12, verbose=2)(
-                delayed(check_grammar)(d["_id"], d["caption"], d.get("ignore")) for d in docs
+                delayed(check_grammar)(d["_id"], d["caption"], d.get("ignore"))
+                for d in docs
             )
             write_res = db.val_captions.bulk_write(
                 [
@@ -417,7 +421,24 @@ def get_repl_values(data):
 
 
 if __name__ == "__main__":
-    df = pd.read_json('tid_2_captions.json', lines=True)
-    errors = Parallel(n_jobs=8, verbose=2)(delayed(check_grammar)(**r) for _, r in df.iterrows())
-    with open('tid_2_errors.json', 'w') as fout:
-        json.dump([e for e in errors if len(e['matches']) > 0], fout, indent=2)
+    df = pd.read_json("captions.jsonl", lines=True)
+    df['question_id'] = df.pop('qid')
+
+    def _chunked(df, size=1000):
+        total = len(df) // size + 1
+        for i in range(total):
+            chunk = df.iloc[i * size : (i + 1) * size]
+            caption = "\n".join(chunk['caption'].drop_duplicates().tolist())
+            yield i, {"language": "en-US", "text": caption}
+
+
+    def req(i, params):
+        resp = post(URL, params=params)
+        resp.raise_for_status()
+        with open(f'data/parts/err_{i}.json', 'w') as fout:
+            json.dump(resp.json(), fout, indent=2)
+
+
+    errors = Parallel(n_jobs=4, verbose=2)(
+        delayed(req)(i, params) for i, params in _chunked(df)
+    )
