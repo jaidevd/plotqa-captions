@@ -134,3 +134,6 @@ data/grammar.txt
 
 LanguageTool/*
 data/mongo/*
+
+*.json
+*.jsonl

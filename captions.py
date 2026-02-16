@@ -129,9 +129,7 @@ def randomize_39(answer):
         "The difference between the {{ X }} and the {{ Y }} is {{ answer }}.",
         "The {{ X }} and the {{ Y }} differ by {{ answer }}.",
         "The difference between the {{ Y }} and the {{ X }} is {{ answer }}.",
-        "The {{ Y }} and the {{ X }} differ by {{ answer }}.",
-        "{{ answer }} is the difference between the {{ X }} and the {{ Y }}.",
-        "{{ answer }} is the difference between the {{ Y }} and the {{ X }}.",
+        "The {{ Y }} and the {{ X }} differ by {{ answer }}."
     ]
     equals = [
         "The {{ X }} is equal to the {{ Y }}.",
@@ -275,9 +273,7 @@ def randomize_19(answer):
     """In how many groups is the metric greater than value?"""
     zeroes = [
         "The {{ metric }} is not greater than {{ value }} in any {{ groups }}.",
-        "The {{ metric }} is never more than {{ value }} in any {{ groups }}.",
-        "In no {{ groups }} is the {{ metric }} greater than the {{ value }}.",
-        "In none of the {{ groups }} is the {{ metric }} greater than the {{ value }}.",
+        "The {{ metric }} is never more than {{ value }} in any {{ groups }}."
     ]
     others = [
         "The {{ metric }} is greater than {{ value }} in {{ answer }} {{ groups }}.",
@@ -651,7 +647,7 @@ def randomize_14(answer):
     """Does the {{ ylabel }} monotonically increase over the {{ plural_xlabel }}?"""
     if answer.lower() == "yes":
         return "The {{ ylabel }} monotonically increases over the {{ plural_xlabel }}."
-    return "The {{ ylabel }} does not monotonically increases over the {{ plural_xlabel }}."
+    return "The {{ ylabel }} does not monotonically increase over the {{ plural_xlabel }}."
 
 
 @binary_check
@@ -697,8 +693,8 @@ def randomize_49(answer):
         "In every {{ group }}, the {{ Z }} is less than the sum of the {{ Y }} and {{ X }}.",
     ]
     nays = [
-        "The sum of the {{ X }} and {{ Y }} is not greater than the {{ Z }} in every group.",
-        "The sum of the {{ Y }} and {{ X }} is not greater than the {{ Z }} in every group."
+        "The sum of the {{ X }} and {{ Y }} is less than or equal to the {{ Z }} in every group.",
+        "The sum of the {{ Y }} and {{ X }} is less than or equal to the {{ Z }} in every group."
     ]
     if answer.lower() == "yes":
         return choice(yays)
