@@ -1,11 +1,12 @@
 """Utilities to fix grammatical errors in captions. Grammar checks are done with LanguageTool."""
 
-import json
+from bisect import bisect_right
 from collections import Counter
-from requests import post, get
+from requests import get
 from joblib import Parallel, delayed
 from spacy.tokens import Doc
-import pandas as pd
+from pymongo import MongoClient, UpdateOne
+from tqdm import tqdm
 
 URL = "http://localhost:8081/v2/check"
 AUX_VERB_PLURALIZE = {
@@ -165,25 +166,136 @@ def get_repl_values(data):
     return set(values)
 
 
-if __name__ == "__main__":
-    df = pd.read_json("captions.jsonl", lines=True)
-    df['question_id'] = df.pop('qid')
+def _check_concatenated(docs):
+    """Concatenate captions, send as one LT request, and map matches back.
 
-    def _chunked(df, size=1000):
-        total = len(df) // size + 1
-        for i in range(total):
-            chunk = df.iloc[i * size : (i + 1) * size]
-            caption = "\n".join(chunk['caption'].drop_duplicates().tolist())
-            yield i, {"language": "en-US", "text": caption}
+    Parameters
+    ----------
+    docs : list[dict]
+        Each dict must have ``_id`` and ``caption``.
+
+    Returns
+    -------
+    dict
+        Mapping of ``_id`` to list of LT match objects (with offsets adjusted
+        to be relative to the individual caption).
+    """
+    # Build the concatenated text and an offset map.
+    # offsets[i] is the start position of docs[i] in the blob.
+    offsets = []
+    pos = 0
+    for doc in docs:
+        offsets.append(pos)
+        pos += len(doc["caption"]) + 1  # +1 for the newline separator
+
+    text = "\n".join(doc["caption"] for doc in docs)
+    resp = get(URL, params={"language": "en-US", "text": text})
+    if not resp.ok:
+        print(resp.text)  # NOQA: T201
+        raise ValueError(f"LT request failed with status {resp.status_code}")
+
+    # Assign each match to its caption using the global offset.
+    # bisect_right gives the index of the first offset > match_offset,
+    # so the caption index is one less.
+    result = {doc["_id"]: [] for doc in docs}
+    for match in resp.json()["matches"]:
+        global_offset = match["offset"]
+        idx = bisect_right(offsets, global_offset) - 1
+        doc_id = docs[idx]["_id"]
+        # Adjust offset to be relative to this caption
+        match["offset"] = global_offset - offsets[idx]
+        result[doc_id].append(match)
+
+    return result
 
 
-    def req(i, params):
-        resp = post(URL, params=params)
-        resp.raise_for_status()
-        with open(f'data/parts/err_{i}.json', 'w') as fout:
-            json.dump(resp.json(), fout, indent=2)
+def check_and_store(db="plotqa", collection="captions", batch_size=1000, chunksize=10_000):
+    """Grammar-check captions in MongoDB and update each document with results.
+
+    Captions are concatenated into batches (newline-separated) before being
+    sent to the LanguageTool API. This is substantially faster than one
+    request per caption. Four batches are processed in parallel.
+
+    Finds documents that have a ``caption`` but no ``lt_matches`` yet,
+    and sets the following fields on each document::
+
+        {
+            "lt_matches": [            # list of LanguageTool match objects
+                {
+                    "message": <str>,
+                    "shortMessage": <str>,
+                    "replacements": [{"value": <str>, ...}, ...],
+                    "offset": <int>,       # relative to this caption
+                    "length": <int>,
+                    "context": {"text": <str>, "offset": <int>, "length": <int>},
+                    "sentence": <str>,
+                    "type": {"typeName": <str>},
+                    "rule": {
+                        "id": <str>,
+                        "description": <str>,
+                        "issueType": <str>,
+                        "category": {"id": <str>, "name": <str>},
+                    },
+                    "ignoreForIncompleteSentence": <bool>,
+                    "contextForSureMatch": <int>,
+                },
+                ...
+            ],
+            "n_errors": <int>,         # len(lt_matches), for convenient querying
+        }
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    batch_size : int
+        Number of captions to concatenate per LT request.
+    chunksize : int
+        Number of documents to read from MongoDB per cursor batch.
+    """
+    query = {"caption": {"$exists": True}, "lt_matches": {"$exists": False}}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        chunk = []
+        for doc in tqdm(cursor, total=total):
+            chunk.append(doc)
+            if len(chunk) < chunksize:
+                continue
+            _check_chunk(chunk, coll, batch_size)
+            chunk = []
+        if chunk:
+            _check_chunk(chunk, coll, batch_size)
 
 
-    errors = Parallel(n_jobs=4, verbose=2)(
-        delayed(req)(i, params) for i, params in _chunked(df)
+def _check_chunk(chunk, coll, batch_size):
+    """Split a chunk into sub-batches, check in parallel, and write updates."""
+    # Split into sub-batches of batch_size
+    sub_batches = [
+        chunk[i : i + batch_size] for i in range(0, len(chunk), batch_size)
+    ]
+    # Process sub-batches in parallel (4 concurrent LT requests)
+    batch_results = Parallel(n_jobs=4, verbose=2)(
+        delayed(_check_concatenated)(sub) for sub in sub_batches
     )
+    # Merge results and write to MongoDB
+    ops = []
+    for result in batch_results:
+        for doc_id, matches in result.items():
+            ops.append(
+                UpdateOne(
+                    {"_id": doc_id},
+                    {"$set": {"lt_matches": matches, "n_errors": len(matches)}},
+                )
+            )
+    coll.bulk_write(ops, ordered=False)
+
+
+if __name__ == "__main__":
+    import sys
+    db = sys.argv[1] if len(sys.argv) > 1 else "plotqa"
+    collection = sys.argv[2] if len(sys.argv) > 2 else "captions"
+    check_and_store(db=db, collection=collection)

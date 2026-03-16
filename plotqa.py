@@ -6,8 +6,23 @@ from tornado.template import Template
 import yaml
 import pandas as pd
 import warnings
+from joblib import Parallel, delayed
+from pymongo import MongoClient, InsertOne, UpdateOne
+from tqdm import tqdm
+from fixes import is_structural
 
 op = os.path
+
+TEMPLATES_PATH = op.join(op.dirname(__file__), "qa_templates.yaml")
+
+
+def _load_templates():
+    """Load qa_templates.yaml and return (tmpl_list, tmpl_cfg DataFrame)."""
+    with open(TEMPLATES_PATH, "r") as fin:
+        raw = yaml.safe_load(fin)
+    tmpl_list = [{"id": t["id"], "regex": t["regex"]} for t in raw]
+    tmpl_cfg = pd.DataFrame.from_records(raw, index="id")
+    return tmpl_list, tmpl_cfg
 
 
 def search_templates(tmpls, question_id, question_string, **kwargs):
@@ -75,24 +90,113 @@ def generate_caption(qa, template):
     return {'qid': qa['question_id'], 'caption': generated}
 
 
-if __name__ == "__main__":
-    from joblib import Parallel, delayed
-    from glob import glob
-    from tqdm import tqdm
+def match_and_store(path, db="plotqa", collection="captions", chunksize=10_000):
+    """Read a source JSONL file, match each question to a template, and insert into MongoDB.
 
-    with open("qa_templates.yaml", "r") as fin:
-        tmpl_cfg = pd.DataFrame.from_records(yaml.safe_load(fin), index="id")
+    The source file is expected to have at least: `question_id`, `question_string`, `answer`.
 
-    for i, file in tqdm(enumerate(glob('data/parts/*_matched_qa.jsonl'))):
-        outfile = f"data/parts/{i}_captions.jsonl"
-        df = pd.read_json(file, lines=True)
-        df.dropna(subset=['template_id', 'answer'], inplace=True)
-        templates = tmpl_cfg.loc[df['template_id']]
-        captions = Parallel(n_jobs=-1, verbose=2)(
-            delayed(generate_caption)(qa, tmpl) for (_, qa), (_, tmpl) in zip(
-                df.iterrows(), templates.iterrows()
+    Each inserted document has the schema::
+
+        {
+            "_id": <question_id>,
+            "question_string": <str>,
+            "answer": <str or number>,
+            "template_id": <int or None>,
+            "regex_matches": <dict>,   # named groups extracted by the matched regex
+        }
+
+    Parameters
+    ----------
+    path : str
+        Path to the source JSONL file.
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of rows to process per batch.
+    """
+    tmpl_list, _ = _load_templates()
+    with MongoClient() as client:
+        coll = client[db][collection]
+        for chunk in tqdm(pd.read_json(path, lines=True, chunksize=chunksize)):
+            chunk = chunk[~chunk["question_string"].map(is_structural)]
+            if chunk.empty:
+                continue
+            results = Parallel(n_jobs=6, verbose=2)(
+                delayed(search_templates)(
+                    tmpl_list, row["question_id"], row["question_string"]
+                )
+                for _, row in chunk.iterrows()
             )
-        )
-        pd.DataFrame.from_records(captions).to_json(
-            outfile, lines=True, orient="records"
-        )
+            ops = []
+            for (_, row), result in zip(chunk.iterrows(), results):
+                doc = {
+                    "_id": row["question_id"],
+                    "question_string": row["question_string"],
+                    "answer": row["answer"],
+                    "template_id": result["template_id"],
+                    "regex_matches": result["matches"] or None,
+                }
+                ops.append(InsertOne(doc))
+            if ops:
+                coll.bulk_write(ops, ordered=False)
+
+
+def generate_and_store(db="plotqa", collection="captions", chunksize=10_000):
+    """Generate captions for all matched documents in MongoDB and update them in place.
+
+    Reads documents that have a `template_id` but no `caption` yet,
+    generates a caption for each, and sets the `caption` field.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    _, tmpl_cfg = _load_templates()
+    query = {"template_id": {"$ne": None}, "caption": {"$exists": False}}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _generate_batch(batch, tmpl_cfg, coll)
+            batch = []
+        if batch:
+            _generate_batch(batch, tmpl_cfg, coll)
+
+
+def _generate_batch(batch, tmpl_cfg, coll):
+    """Generate captions for a batch of MongoDB documents and write updates."""
+    qa_rows = []
+    tmpl_rows = []
+    for doc in batch:
+        tid = doc["template_id"]
+        if tid not in tmpl_cfg.index:
+            continue
+        qa_rows.append({
+            "question_id": doc["_id"],
+            "answer": doc["answer"],
+            "matches": doc["regex_matches"],
+        })
+        tmpl_rows.append(tmpl_cfg.loc[tid].to_dict())
+    if not qa_rows:
+        return
+    results = Parallel(n_jobs=6, verbose=2)(
+        delayed(generate_caption)(qa, tmpl)
+        for qa, tmpl in zip(qa_rows, tmpl_rows)
+    )
+    ops = [
+        UpdateOne({"_id": r["qid"]}, {"$set": {"caption": r["caption"]}})
+        for r in results
+    ]
+    coll.bulk_write(ops, ordered=False)
