@@ -200,3 +200,7 @@ def _generate_batch(batch, tmpl_cfg, coll):
         for r in results
     ]
     coll.bulk_write(ops, ordered=False)
+
+
+if __name__ == "__main__":
+    generate_and_store()

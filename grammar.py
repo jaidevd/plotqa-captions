@@ -158,6 +158,157 @@ def fix_verb_subject_agreement(doc):
     return Doc(doc.vocab, words, spaces).text
 
 
+def disable_false_nns_in_nnp(db="plotqa", collection="captions", chunksize=10_000):
+    """Disable NNS_IN_NNP_VBZ for docs where spaCy confirms verb-subject agreement.
+
+    Uses spaCy to parse each caption flagged with NNS_IN_NNP_VBZ.
+    If the root verb and its subject actually agree, the rule is a false
+    positive — add it to the document's ``disabledRules`` array.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    from spacy import load
+    nlp = load("en_core_web_sm")
+
+    query = {"lt_matches.rule.id": "NNS_IN_NNP_VBZ"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                verb, subject = find_root_nsubj(parsed)
+                agrees, _ = has_agreement(verb, subject)
+            except (ValueError, IndexError):
+                # Can't parse — leave the rule enabled
+                continue
+            if agrees:
+                ops.append(
+                    UpdateOne(
+                        {"_id": doc["_id"]},
+                        {"$addToSet": {"disabledRules": "NNS_IN_NNP_VBZ"}},
+                    )
+                )
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
+
+
+def fix_agreement_in_mongo(db="plotqa", collection="captions", chunksize=10_000,
+                           rule_id="SUBJECT_VERB_AGREEMENT_PLURAL"):
+    """Fix verb-subject agreement in captions flagged with an agreement rule.
+
+    Uses spaCy to parse each caption. If the verb and subject disagree,
+    fixes the verb form and updates the caption in MongoDB.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    rule_id : str
+        The LT rule ID to target.
+    """
+    from spacy import load
+    nlp = load("en_core_web_sm")
+
+    query = {"lt_matches.rule.id": rule_id}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                fixed = fix_verb_subject_agreement(parsed)
+            except (ValueError, IndexError):
+                continue
+            if fixed != doc["caption"]:
+                ops.append(
+                    UpdateOne(
+                        {"_id": doc["_id"]},
+                        {"$set": {"caption": fixed}},
+                    )
+                )
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
+
+
+def fix_top_two_plural_in_mongo(db="plotqa", collection="captions", chunksize=10_000):
+    """Fix 'The top two {metric} differ' by pluralizing the singular nsubj.
+
+    Uses spaCy to find the nominal subject of 'differ' and replaces
+    it with its plural form.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    import inflect
+    from spacy import load
+    nlp = load("en_core_web_sm")
+    p = inflect.engine()
+
+    query = {"lt_matches.rule.id": "SUBJECT_VERB_AGREEMENT"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                words = [t.text for t in parsed]
+                spaces = [bool(t.whitespace_) for t in parsed]
+                changed = False
+                for tok in parsed:
+                    if tok.text == "differ" and tok.dep_ == "ROOT":
+                        for child in tok.children:
+                            if child.dep_ == "nsubj" and child.tag_ == "NN":
+                                words[child.i] = p.plural(child.text)
+                                changed = True
+                                break
+                        break
+                if changed:
+                    fixed = Doc(parsed.vocab, words, spaces).text
+                    ops.append(
+                        UpdateOne(
+                            {"_id": doc["_id"]},
+                            {"$set": {"caption": fixed}},
+                        )
+                    )
+            except (ValueError, IndexError):
+                continue
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
+
+
 def get_repl_values(data):
     values = []
     for err in data:
@@ -172,7 +323,8 @@ def _check_concatenated(docs):
     Parameters
     ----------
     docs : list[dict]
-        Each dict must have ``_id`` and ``caption``.
+        Each dict must have ``_id`` and ``caption``, and optionally
+        ``disabledRules`` (a list of LT rule IDs to suppress).
 
     Returns
     -------
@@ -188,8 +340,16 @@ def _check_concatenated(docs):
         offsets.append(pos)
         pos += len(doc["caption"]) + 1  # +1 for the newline separator
 
+    # Collect the union of all disabled rules across the batch
+    disabled = set()
+    for doc in docs:
+        disabled.update(doc.get("disabledRules") or [])
+
     text = "\n".join(doc["caption"] for doc in docs)
-    resp = get(URL, params={"language": "en-US", "text": text})
+    params = {"language": "en-US", "text": text}
+    if disabled:
+        params["disabledRules"] = ",".join(disabled)
+    resp = get(URL, params=params)
     if not resp.ok:
         print(resp.text)  # NOQA: T201
         raise ValueError(f"LT request failed with status {resp.status_code}")
@@ -209,15 +369,21 @@ def _check_concatenated(docs):
     return result
 
 
-def check_and_store(db="plotqa", collection="captions", batch_size=1000, chunksize=10_000):
+def check_and_store(db="plotqa", collection="captions", batch_size=1000, chunksize=10_000,
+                    query=None):
     """Grammar-check captions in MongoDB and update each document with results.
 
     Captions are concatenated into batches (newline-separated) before being
     sent to the LanguageTool API. This is substantially faster than one
     request per caption. Four batches are processed in parallel.
 
-    Finds documents that have a ``caption`` but no ``lt_matches`` yet,
-    and sets the following fields on each document::
+    By default, finds documents that have a ``caption`` but no ``lt_matches``
+    yet. Pass a custom ``query`` to re-check specific documents, e.g.::
+
+        # Re-check only documents that had the CONSECUTIVE_SPACES error
+        check_and_store(query={"lt_matches.rule.id": "CONSECUTIVE_SPACES"})
+
+    Sets the following fields on each matched document::
 
         {
             "lt_matches": [            # list of LanguageTool match objects
@@ -254,12 +420,16 @@ def check_and_store(db="plotqa", collection="captions", batch_size=1000, chunksi
         Number of captions to concatenate per LT request.
     chunksize : int
         Number of documents to read from MongoDB per cursor batch.
+    query : dict, optional
+        Custom MongoDB query to select which documents to grammar-check.
+        Defaults to documents that have a caption but no lt_matches yet.
     """
-    query = {"caption": {"$exists": True}, "lt_matches": {"$exists": False}}
+    if query is None:  # Then do all
+        query = {"caption": {"$exists": True}}  # , "lt_matches": {"$exists": False}}
     with MongoClient() as client:
         coll = client[db][collection]
         total = coll.count_documents(query)
-        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        cursor = coll.find(query, {"_id": 1, "caption": 1, "disabledRules": 1}).batch_size(chunksize)
         chunk = []
         for doc in tqdm(cursor, total=total):
             chunk.append(doc)
@@ -295,7 +465,4 @@ def _check_chunk(chunk, coll, batch_size):
 
 
 if __name__ == "__main__":
-    import sys
-    db = sys.argv[1] if len(sys.argv) > 1 else "plotqa"
-    collection = sys.argv[2] if len(sys.argv) > 2 else "captions"
-    check_and_store(db=db, collection=collection)
+    check_and_store()

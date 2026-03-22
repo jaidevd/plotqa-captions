@@ -701,5 +701,47 @@ def randomize_49(answer):
     return choice(nays)
 
 
+@binary_check
+def randomize_40(answer):
+    """Do a majority of the groups between x1 and x2 have metric greater than threshold?"""
+    yays = [
+        "A majority of the {{ groups }} {{ range }} have {{ metric }} greater than {{ threshold }}.",
+        "In a majority of the {{ groups }} {{ range }}, the {{ metric }} is greater than {{ threshold }}.",
+        "The {{ metric }} is greater than {{ threshold }} in a majority of the {{ groups }} {{ range }}.",
+        "Most of the {{ groups }} {{ range }} have {{ metric }} greater than {{ threshold }}.",
+    ]
+    nays = [
+        "A majority of the {{ groups }} {{ range }} do not have {{ metric }} greater than {{ threshold }}.",
+        "In most of the {{ groups }} {{ range }}, the {{ metric }} is not greater than {{ threshold }}.",
+        "The {{ metric }} is not greater than {{ threshold }} in a majority of the {{ groups }} {{ range }}.",
+    ]
+    if answer.lower() == "yes":
+        return choice(yays)
+    return choice(nays)
+
+
+@binary_check
+def randomize_45(answer):
+    """Is the difference between X in group1 and group2 greater than the difference
+    between Y in group3 and group4?"""
+    yays = [
+        "The difference between the {{ X }} in {{ group1 }} and {{ group2 }} is greater than"
+        " the difference between the {{ Y }} in {{ group3 }} and {{ group4 }}.",
+        "The difference between the {{ X }} in {{ group2 }} and {{ group1 }} is greater than"
+        " the difference between the {{ Y }} in {{ group4 }} and {{ group3 }}.",
+        "The difference between the {{ Y }} in {{ group3 }} and {{ group4 }} is less than"
+        " the difference between the {{ X }} in {{ group1 }} and {{ group2 }}.",
+    ]
+    nays = [
+        "The difference between the {{ X }} in {{ group1 }} and {{ group2 }} is not greater than"
+        " the difference between the {{ Y }} in {{ group3 }} and {{ group4 }}.",
+        "The difference between the {{ X }} in {{ group1 }} and {{ group2 }} is equal to or less than"
+        " the difference between the {{ Y }} in {{ group3 }} and {{ group4 }}.",
+    ]
+    if answer.lower() == "yes":
+        return choice(yays)
+    return choice(nays)
+
+
 if __name__ == "__main__":
     print(randomize_3("foo"))

@@ -96,7 +96,15 @@ _TYPOS = [
     (r"\blargent city\b", "largest city"),
     (r"\bmatural\b", "natural"),
     (r"\bunderweighted\b", "underweight"),
+    (r"\bexpectancys\b", "expectancies"),
+    (r"\bdensitys\b", "densities"),
+    (r"\bindexs\b", "indices"),
     (r"\bbranche\b", "branches"),
+    (r"\bEntrace\b", "Entrance"),
+    (r"\bFemal\b", "Female"),
+    (r"\bfemal\b", "female"),
+    (r"\blabor\b", "labour"),
+    (r"(?i)\brdb\b", ""),
     # Casing of country names
     (r"\bbelgium\b", "Belgium"),
     (r"\bsweden\b", "Sweden"),
@@ -118,6 +126,10 @@ _TYPOS = [
     (r"\bnorway\b", "Norway"),
     (r"\bgermany\b", "Germany"),
     (r"\bnew zealand\b", "New Zealand"),
+    (r"\bnetherlands\b", "Netherlands"),
+    (r"\bkorea\b", "Korea"),
+    (r"\bczech republic\b", "Czech Republic"),
+    (r"\bslovak republic\b", "Slovak Republic"),
     # Casing of organization names
     (r"\binternational monetary fund\b", "International Monetary Fund"),
     (r"\bworld bank\b", "World Bank"),
@@ -127,15 +139,14 @@ _TYPOS = [
     (r"\bari treatment\b", "ARI treatment"),
     (r"\bcpia rating\b", "CPIA rating"),
     (r"\bdac donors\b", "DAC donors"),
+    (r"\batms\b", "ATMs"),
     (r"Mauriti the US", "Mauritius"),
     (r"\bUSable\b", "usable"),
     (r"\bUSed\b", "used"),
     (r"\bUSers\b", "users"),
     (r"\bUSe\b", "use"),
     (r"\bUSing\b", "Using"),
-    (r"\brdb\b", ""),
-    (r"\bUndisbursed\b", ""),
-    (r"\bVitamin A\b", "vitamin A"),
+    (r"(?i)\bvitamin a\b", "vitamin A"),
     (r"\bNumber of enrolments of both sexes\b", "number of enrolments of both sexes"),
 ]
 
@@ -172,51 +183,49 @@ _HTML_ENTITIES = [
     (r"&#39;", "'"),
     (r"r&;d", "R&D"),
     (r"R&;D", "R&D"),
+    (r"\br&d\b", "R&D"),
     (r"s&;p", "S&P"),
+    (r"\bs&p\b", "S&P"),
     (r"R&amp", "R&"),
     (r"r&amp", "r&"),
 ]
 
 _DETERMINERS_GPES = [
-    (r"\bMiddle East\b", "the Middle East"),
-    (r"\bBahamas\b", "the Bahamas"),
-    (r"\bCayman Islands\b", "the Cayman Islands"),
-    (r"\bCentral African Republic\b", "the Central African Republic"),
-    (r"\bChannel Islands\b", "the Channel Islands"),
-    (r"\bComoros\b", "the Comoros"),
-    (r"\bCongo\b", "the Congo"),
-    (r"\bCzech Republic\b", "the Czech Republic"),
-    (r"\bDominican Republic\b", "the Dominican Republic"),
-    (r"\bGambia\b", "the Gambia"),
-    (r"\bIsle of Man\b", "the Isle of Man"),
-    (r"\bMaldives\b", "the Maldives"),
-    (r"\bMarshall Islands\b", "the Marshall Islands"),
-    (r"\bNetherlands\b", "the Netherlands"),
-    (r"\bPhilippines\b", "the Philippines"),
-    (r"\bSlovak Republic\b", "the Slovak Republic"),
-    (r"\bSolomon Islands\b", "the Solomon Islands"),
-    (r"\bTurks and Caicos Islands\b", "the Turks and Caicos Islands"),
-    (r"\bUnited Arab Emirates\b", "the United Arab Emirates"),
-    (r"\bUnited Kingdom\b", "the United Kingdom"),
-    (r"\bUnited States\b", "the United States"),
-    (r"\bVirgin Islands\b", "the Virgin Islands"),
-    (r"\bWest Bank\b", "the West Bank"),
-    (r"\bCaribbean\b", "the Caribbean"),
+    (r"(?<!\bthe )(?<!\bThe )\bMiddle East\b", "the Middle East"),
+    (r"(?<!\bthe )(?<!\bThe )\bBahamas\b", "the Bahamas"),
+    (r"(?<!\bthe )(?<!\bThe )\bCayman Islands\b", "the Cayman Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bCentral African Republic\b", "the Central African Republic"),
+    (r"(?<!\bthe )(?<!\bThe )\bChannel Islands\b", "the Channel Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bComoros\b", "the Comoros"),
+    (r"(?<!\bthe )(?<!\bThe )\bCongo\b", "the Congo"),
+    (r"(?<!\bthe )(?<!\bThe )\bCzech Republic\b", "the Czech Republic"),
+    (r"(?<!\bthe )(?<!\bThe )\bDominican Republic\b", "the Dominican Republic"),
+    (r"(?<!\bthe )(?<!\bThe )\bGambia\b", "the Gambia"),
+    (r"(?<!\bthe )(?<!\bThe )\bIsle of Man\b", "the Isle of Man"),
+    (r"(?<!\bthe )(?<!\bThe )\bMaldives\b", "the Maldives"),
+    (r"(?<!\bthe )(?<!\bThe )\bMarshall Islands\b", "the Marshall Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bNetherlands\b", "the Netherlands"),
+    (r"(?<!\bthe )(?<!\bThe )\bPhilippines\b", "the Philippines"),
+    (r"(?<!\bthe )(?<!\bThe )\bSlovak Republic\b", "the Slovak Republic"),
+    (r"(?<!\bthe )(?<!\bThe )\bSolomon Islands\b", "the Solomon Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bTurks and Caicos Islands\b", "the Turks and Caicos Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bUnited Arab Emirates\b", "the United Arab Emirates"),
+    (r"(?<!\bthe )(?<!\bThe )\bUnited Kingdom\b", "the United Kingdom"),
+    (r"(?<!\bthe )(?<!\bThe )\bUnited States\b", "the United States"),
+    (r"(?<!\bthe )(?<!\bThe )\bVirgin Islands\b", "the Virgin Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bWest Bank\b", "the West Bank"),
+    (r"(?<!\bthe )(?<!\bThe )\bCaribbean\b", "the Caribbean"),
 ]
 
 _OTHER_DETERMINERS = [
-    (r"\b(in|of) Least developed\b", r"\1 the least developed"),
+    (r"\b(In|in|of) Least developed\b", r"\1 the least developed"),
     (r"\bin largest city\b", "in the largest city"),
     (r"\b(in|of) Labor Market\b", r"\1 the labor market"),
-    (r"\bin poorest qunitile\b", "in the poorest qunitile"),
-    (r"\bIn Isle of Man\b", "In the Isle of Man"),
-    (r"\bIn Turks and Caicos Islands\b", "In the Turks and Caicos Islands"),
-    (r"\bin Isle of Man\b", "in the Isle of Man"),
-    (r"\bin Turks and Caicos Islands\b", "in the Turks and Caicos Islands"),
-    (r"\bof Isle of Man\b", "of the Isle of Man"),
-    (r"\bof Turks and Caicos Islands\b", "of the Turks and Caicos Islands"),
-    (r"\bpoorest\b", "the poorest"),
-    (r"\blargest\b", "the largest"),
+    (r"\bin poorest qu[in]+tile\b", "in the poorest quintile"),
+    (r"(?<!\bthe )(?<!\bThe )\bIsle of Man\b", "the Isle of Man"),
+    (r"(?<!\bthe )(?<!\bThe )\bTurks and Caicos Islands\b", "the Turks and Caicos Islands"),
+    (r"(?<!\bthe )(?<!\bThe )\bpoorest\b", "the poorest"),
+    (r"(?<!\bthe )(?<!\bThe )\blargest\b", "the largest"),
 ]
 
 _CURRENCY = [
@@ -232,8 +241,11 @@ _DIACRITICS = [
 ]
 
 _COUNTRY_ALIASES = [
-    (r"\bYemen, Rep\..*?\b", "Yemen"),
-    (r"\bEgypt, Arab Rep\..*?\b", "Egypt"),
+    (r"\bYemen, Rep\.", "Yemen"),
+    (r"\bEgypt, Arab Rep\.", "Egypt"),
+    (r"\bthe Gambia, The\b", "the Gambia"),
+    (r"(?<=^)Gambia, The\b", "The Gambia"),
+    (r"\bGambia, The\b", "the Gambia"),
 ]
 
 _HYPHENATED = [
@@ -252,30 +264,53 @@ _ONE_WORD = [
     (r"\btax payers\b", "taxpayers"),
     (r"\bpeace keepers\b", "peacekeepers"),
     (r"\bwage workers\b", "wageworkers"),
+    (r"\bWage workers\b", "wageworkers"),
 ]
 
-_REPEATED_WORDS = [
-    (r"\btotal Total\b", "total"),
-    (r"\bTotal total\b", "Total"),
-    (r"\btotal total\b", "total"),
-    (r"\bTotal Total\b", "Total"),
-    (r"\bin in\b", "in"),
-    (r"\baverage Average\b", "average"),
-    (r"\bexpenses Expenses\b", "expenses"),
-    (r"\bproduction Production\b", "production"),
-    (r"\brate Rate\b", "rate"),
-    (r"\bsavings Savings\b", "savings"),
-]
+_REPEATED_WORDS_RE = re.compile(r"\b(\w+)\s+(\1)\b", re.IGNORECASE)
 
-_GENDER = [
+
+def _dedup_word(match):
+    """Keep the first occurrence of a repeated word.
+
+    If the repeat is at the start of a sentence (first word is capitalized,
+    second is lowercase), keep the capitalized form.
+    """
+    first, second = match.group(1), match.group(2)
+    return first
+
+
+# Placeholder so SUBSTITUTIONS list still works — the general regex is applied
+# separately via _REPEATED_WORDS_RE in fix_repeated_words().
+_REPEATED_WORDS = []
+
+_POSSESSIVE_APOSTROPHE = [
+    (r"\bunemployed females population\b", "unemployed female population"),
+    (r"\bunemployed males population\b", "unemployed male population"),
     (r"\bfemales population\b", "female population"),
     (r"\bmales population\b", "male population"),
+    (r"\bBenefits incidence\b", "benefit incidence"),
+    (r"\bArmed forces personnel\b", "armed forces"),
 ]
 
+_ONE_PLURAL_MAP = {
+    "years": "year", "countries": "country", "days": "day", "hours": "hour",
+}
+_ONE_PLURAL_RE = re.compile(
+    r"(?i)\b(in|than) 1 (years|countries|days|hours)\b"
+)
+
+
+def _one_plural_repl(match):
+    prep = match.group(1)
+    noun = _ONE_PLURAL_MAP[match.group(2).lower()]
+    return f"{prep} one {noun}"
+
 _MISC = [
+    (r"\b(as|in) thousand metric tons\b", r"\1 one thousand metric tons"),
     (r"\blitre\b", "liter"),
     (r"\baverage per year\b", "average annual"),
-    (r"\bTwenty-\s+foot Equivalent\b", "Twenty-foot Equivalent"),
+    (r"\bTwenty-\s*foot Equivalent Units?\s*\(TEU\)", "twenty-foot equivalent units (TEU)"),
     (r"\( 0 = weak", "(0 = weak"),
     (r"mm \)", "mm)"),
 ]
@@ -284,6 +319,18 @@ _WHITESPACE = [
     (r"(\S)\(", r"\1 ("),  # space before bracket
     (r"\s+\(", " ("),      # collapse multiple spaces before bracket
     (r"\s+", " "),         # collapse repeated whitespace
+]
+
+_PUNCTUATION = [
+    (r'\\\"\s*', ""),        # remove escaped quotes and trailing spaces
+    (r'^""+\s*', ""),        # remove leading empty quotes
+    (r"\s+\.", "."),         # no space before full stop
+    (r"\s+,", ","),          # no space before comma
+    (r",(\S)", r", \1"),     # space after comma
+    (r"\(\s+", "("),         # no space after opening parenthesis
+    (r"\s+\)", ")"),         # no space before closing parenthesis
+    (r'\s+"', '"'),          # no space before closing quote
+    (r'"\s+', '"'),          # no space after opening quote
 ]
 
 # Post-determiner cleanup: "the the" → "the"
@@ -306,9 +353,10 @@ SUBSTITUTIONS = (
     + _HYPHENATED
     + _ONE_WORD
     + _REPEATED_WORDS
-    + _GENDER
+    + _POSSESSIVE_APOSTROPHE
     + _MISC
     + _WHITESPACE
+    + _PUNCTUATION
     + _DEDUP_DETERMINERS
 )
 
@@ -316,10 +364,648 @@ SUBSTITUTIONS = (
 _COMPILED_SUBS = [(re.compile(pat), repl) for pat, repl in SUBSTITUTIONS]
 
 
+_COMPILED_SPELLING = [
+    (re.compile(pat), repl)
+    for pat, repl in _HTML_ENTITIES + _TYPOS + _ABBREVIATIONS + _CURRENCY
+]
+
+_COMPILED_POSSESSIVE = [(re.compile(pat), repl) for pat, repl in _POSSESSIVE_APOSTROPHE]
+
+
+def fix_possessive(caption):
+    """Fix false possessive apostrophe triggers."""
+    for pat, repl in _COMPILED_POSSESSIVE:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_possessive_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix possessive apostrophe errors in captions.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "POSSESSIVE_APOSTROPHE"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_possessive_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_possessive_batch(batch, coll)
+
+
+def _fix_possessive_batch(batch, coll):
+    """Apply possessive fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_possessive(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+def fix_spelling(caption):
+    """Fix typos, abbreviations, HTML entities, and currency symbols."""
+    for pat, repl in _COMPILED_SPELLING:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_spelling_in_mongo(db="plotqa", collection="captions", chunksize=50_000,
+                          rule_id="MORFOLOGIK_RULE_EN_US"):
+    """Fix spelling in captions that have a specific LT error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    rule_id : str
+        The LT rule ID to target.
+    """
+    query = {"lt_matches.rule.id": rule_id}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_spelling_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_spelling_batch(batch, coll)
+
+
+def _fix_spelling_batch(batch, coll):
+    """Apply spelling fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_spelling(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_COMPOUNDS = [(re.compile(pat), repl) for pat, repl in _HYPHENATED + _ONE_WORD]
+
+
+def fix_compounds(caption):
+    """Fix compound words — missing hyphens and words that should be joined."""
+    for pat, repl in _COMPILED_COMPOUNDS:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_compounds_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix compound words in captions that have EN_COMPOUNDS_*, WORKER_COMPOUNDS,
+    KEEPER_COMPOUNDS, or SECOND_LARGEST_HYPHEN errors.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": {
+        "$regex": "^(EN_COMPOUNDS_|WORKER_COMPOUNDS|KEEPER_COMPOUNDS|SECOND_LARGEST_HYPHEN|NON_ANTI_JJ)"
+    }}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_compounds_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_compounds_batch(batch, coll)
+
+
+def _fix_compounds_batch(batch, coll):
+    """Apply compound word fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_compounds(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+def fix_one_plural(caption):
+    """Fix '1 years' → 'one year', '1 countries' → 'one country', etc."""
+    return _ONE_PLURAL_RE.sub(_one_plural_repl, caption)
+
+
+def fix_one_plural_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix 1 + plural noun patterns in captions that have the ONE_PLURAL error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "ONE_PLURAL"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_one_plural_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_one_plural_batch(batch, coll)
+
+
+def _fix_one_plural_batch(batch, coll):
+    """Apply one-plural fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_one_plural(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_COUNTRY_ALIASES = [(re.compile(pat), repl) for pat, repl in _COUNTRY_ALIASES]
+
+
+def fix_country_aliases(caption):
+    """Replace verbose country names with their common form."""
+    for pat, repl in _COMPILED_COUNTRY_ALIASES:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_country_aliases_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix country aliases in captions containing comma-separated country names.
+
+    Targets documents with COMMA_PARENTHESIS_WHITESPACE or DOUBLE_PUNCTUATION
+    errors, which are often caused by names like 'Yemen, Rep.' or 'Egypt, Arab Rep.'.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"$or": [
+        {"caption": {"$regex": "Rep\\."}},
+        {"caption": {"$regex": "Arab Rep\\."}},
+        {"caption": {"$regex": "Gambia, The"}},
+    ]}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_country_aliases_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_country_aliases_batch(batch, coll)
+
+
+def _fix_country_aliases_batch(batch, coll):
+    """Apply country alias fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_country_aliases(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_MISC = [(re.compile(pat), repl) for pat, repl in _MISC]
+
+
+def fix_misc(caption):
+    """Apply miscellaneous text fixes."""
+    for pat, repl in _COMPILED_MISC:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_misc_in_mongo(db="plotqa", collection="captions", chunksize=50_000,
+                      rule_id="NODT_DOZEN"):
+    """Apply miscellaneous fixes to captions matching a given LT rule.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    rule_id : str
+        The LT rule ID to target.
+    """
+    query = {"lt_matches.rule.id": rule_id}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_misc_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_misc_batch(batch, coll)
+
+
+def _fix_misc_batch(batch, coll):
+    """Apply misc fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_misc(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_DIACRITICS = [(re.compile(pat), repl) for pat, repl in _DIACRITICS]
+
+
+def fix_diacritics(caption):
+    """Replace ASCII approximations of names with their proper diacritical forms."""
+    for pat, repl in _COMPILED_DIACRITICS:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_diacritics_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix diacritics in captions that have any EN_DIACRITICS_REPLACE_* error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": {"$regex": "^EN_DIACRITICS_REPLACE_"}}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_diacritics_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_diacritics_batch(batch, coll)
+
+
+def _fix_diacritics_batch(batch, coll):
+    """Apply diacritics fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_diacritics(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_SUPERLATIVE = [(re.compile(pat), repl) for pat, repl in _OTHER_DETERMINERS]
+
+
+def fix_superlatives(caption):
+    """Add missing determiners before superlatives and related phrases."""
+    for pat, repl in _COMPILED_SUPERLATIVE:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_superlatives_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix missing determiners before superlatives that have the THE_SUPERLATIVE error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "THE_SUPERLATIVE"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_superlatives_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_superlatives_batch(batch, coll)
+
+
+def _fix_superlatives_batch(batch, coll):
+    """Apply superlative fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_superlatives(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+def fix_repeated_words(caption):
+    """Remove consecutive duplicate words, keeping the first occurrence."""
+    return _REPEATED_WORDS_RE.sub(_dedup_word, caption)
+
+
+def fix_repeated_words_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix repeated words in captions that have the ENGLISH_WORD_REPEAT_RULE error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "ENGLISH_WORD_REPEAT_RULE"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_repeated_words_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_repeated_words_batch(batch, coll)
+
+
+def _fix_repeated_words_batch(batch, coll):
+    """Apply repeated word fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_repeated_words(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+_COMPILED_WS = [(re.compile(pat), repl) for pat, repl in _WHITESPACE]
+_COMPILED_DETERMINERS = (
+    [(re.compile(pat), repl) for pat, repl in _DETERMINERS_GPES + _OTHER_DETERMINERS]
+    + [(re.compile(pat), repl) for pat, repl in _DEDUP_DETERMINERS]
+)
+
+
+_COMPILED_PUNCT = [(re.compile(pat), repl) for pat, repl in _PUNCTUATION]
+
+
+def fix_punctuation(caption):
+    """Fix spacing around commas, full stops, parentheses, and quotes."""
+    for pat, repl in _COMPILED_PUNCT:
+        caption = pat.sub(repl, caption)
+    return caption.strip()
+
+
+def fix_punctuation_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix punctuation spacing in captions that have the COMMA_PARENTHESIS_WHITESPACE error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "COMMA_PARENTHESIS_WHITESPACE"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_punctuation_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_punctuation_batch(batch, coll)
+
+
+def _fix_punctuation_batch(batch, coll):
+    """Apply punctuation fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_punctuation(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+def fix_determiners(caption):
+    """Add missing determiners for geographic proper nouns and other known cases."""
+    for pat, repl in _COMPILED_DETERMINERS:
+        caption = pat.sub(repl, caption)
+    return caption
+
+
+def fix_determiners_in_mongo(db="plotqa", collection="captions", chunksize=50_000):
+    """Fix missing determiners in captions that have the DETERMINER_GEOGRAPHICAL_WORD error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    """
+    query = {"lt_matches.rule.id": "DETERMINER_GEOGRAPHICAL_WORD"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_determiners_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_determiners_batch(batch, coll)
+
+
+def _fix_determiners_batch(batch, coll):
+    """Apply determiner fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_determiners(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
+def fix_whitespace(caption):
+    """Collapse consecutive spaces, add space before brackets, and trim."""
+    for pat, repl in _COMPILED_WS:
+        caption = pat.sub(repl, caption)
+    return caption.strip()
+
+
+def fix_whitespace_in_mongo(db="plotqa", collection="captions", chunksize=50_000,
+                            rule_id="CONSECUTIVE_SPACES"):
+    """Fix whitespace in captions that have a specific whitespace-related LT error.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    rule_id : str
+        The LT rule ID to target, e.g. ``"CONSECUTIVE_SPACES"`` or
+        ``"SPACE_BEFORE_PARENTHESIS"``.
+    """
+    query = {"lt_matches.rule.id": rule_id}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        batch = []
+        for doc in tqdm(cursor, total=total):
+            batch.append(doc)
+            if len(batch) < chunksize:
+                continue
+            _fix_whitespace_batch(batch, coll)
+            batch = []
+        if batch:
+            _fix_whitespace_batch(batch, coll)
+
+
+def _fix_whitespace_batch(batch, coll):
+    """Apply whitespace fixes to a batch and write updates."""
+    ops = []
+    for doc in batch:
+        fixed = fix_whitespace(doc["caption"])
+        ops.append(
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {"caption": fixed}},
+            )
+        )
+    coll.bulk_write(ops, ordered=False)
+
+
 def fix_caption(caption):
     """Apply all text substitutions to a caption string."""
     for pat, repl in _COMPILED_SUBS:
         caption = pat.sub(repl, caption)
+    caption = fix_repeated_words(caption)
     return caption.strip()
 
 
@@ -366,3 +1052,7 @@ def _fix_batch(batch, coll):
             )
         )
     coll.bulk_write(ops, ordered=False)
+
+
+if __name__ == "__main__":
+    fix_whitespace_in_mongo(rule_id="CONSECUTIVE_SPACES")
