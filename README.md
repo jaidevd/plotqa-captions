@@ -146,6 +146,7 @@ Run the following commands to make changes in LanguageTool's configuration:
 $ ln -s ./lt-config/lt_config.ini ./LanguageTool/config.ini
 $ echo >> ./LanguageTool/org/languagetool/resource/en/hunspell/spelling.txt
 $ cat ./lt-config/british_spelling.txt >> ./LanguageTool/org/languagetool/resource/en/hunspell/spelling.txt
+$ cat ./lt-config/ignore.txt >> ./LanguageTool/org/languagetool/resource/en/hunspell/spelling.txt
 ```
 
 **Note on types of questions:** The original dataset contains questions

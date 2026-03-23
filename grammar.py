@@ -1,16 +1,12 @@
 """Utilities to fix grammatical errors in captions. Grammar checks are done with LanguageTool."""
-import json
+
+from bisect import bisect_right
 from collections import Counter
 from requests import get
-import gc
-import re
 from joblib import Parallel, delayed
-from tqdm import tqdm
 from spacy.tokens import Doc
-import pandas as pd
 from pymongo import MongoClient, UpdateOne
-from pymongo.errors import InvalidOperation  # NOQA: F401
-import bson  # NOQA: F401
+from tqdm import tqdm
 
 URL = "http://localhost:8081/v2/check"
 AUX_VERB_PLURALIZE = {
@@ -23,30 +19,6 @@ AUX_VERB_PLURALIZE = {
 AUX_VERB_SINGULARIZE = {v: k for k, v in AUX_VERB_PLURALIZE.items()}
 is_noun_singular = lambda x: x.tag_ in ("NN", "NNP")  # NOQA: E731
 is_noun_plural = lambda x: x.tag_ in ("NNS", "NNPS")  # NOQA: E731
-
-
-def process_from_mongo(query=None):
-    """Retrieve captions from MongoDB and process them with LanguageTool.
-    Write the results back to the database."""
-    if query is None:
-        query = {}
-    with MongoClient() as client:
-        db = client.plotqa
-        for batch in tqdm(db.val_captions.find_raw_batches(query, batch_size=1_000_000)):
-            docs = bson.decode_all(batch)
-            res = Parallel(n_jobs=12, verbose=2)(
-                delayed(check_grammar)(d["_id"], d["caption"], d.get("ignore")) for d in docs
-            )
-            write_res = db.val_captions.bulk_write(
-                [
-                    UpdateOne(
-                        {"_id": r["question_id"]},
-                        {"$set": {"matches": r["matches"], "check": True}},
-                    )
-                    for r in res
-                ]
-            )
-            print(write_res.bulk_api_result)  # NOQA: T201
 
 
 def check_grammar(question_id, caption, ignore=None, template_id=None):
@@ -186,226 +158,155 @@ def fix_verb_subject_agreement(doc):
     return Doc(doc.vocab, words, spaces).text
 
 
-def fix_spaces(s):
+def disable_false_nns_in_nnp(db="plotqa", collection="captions", chunksize=10_000):
+    """Disable NNS_IN_NNP_VBZ for docs where spaCy confirms verb-subject agreement.
+
+    Uses spaCy to parse each caption flagged with NNS_IN_NNP_VBZ.
+    If the root verb and its subject actually agree, the rule is a false
+    positive — add it to the document's ``disabledRules`` array.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
     """
-    0. Trim leading and trailing whitespaces.
-    1. Don't put a space before the full stop.
-    2. Don't have too many consecuitive spaces.
-    3. Remove spaces before commas.
-    4. Remove unnecessary quoute marks.
+    from spacy import load
+    nlp = load("en_core_web_sm")
+
+    query = {"lt_matches.rule.id": "NNS_IN_NNP_VBZ"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                verb, subject = find_root_nsubj(parsed)
+                agrees, _ = has_agreement(verb, subject)
+            except (ValueError, IndexError):
+                # Can't parse — leave the rule enabled
+                continue
+            if agrees:
+                ops.append(
+                    UpdateOne(
+                        {"_id": doc["_id"]},
+                        {"$addToSet": {"disabledRules": "NNS_IN_NNP_VBZ"}},
+                    )
+                )
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
+
+
+def fix_agreement_in_mongo(db="plotqa", collection="captions", chunksize=10_000,
+                           rule_id="SUBJECT_VERB_AGREEMENT_PLURAL"):
+    """Fix verb-subject agreement in captions flagged with an agreement rule.
+
+    Uses spaCy to parse each caption. If the verb and subject disagree,
+    fixes the verb form and updates the caption in MongoDB.
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
+    rule_id : str
+        The LT rule ID to target.
     """
-    s = s.strip()
-    s = re.sub(r"\s+\.", ".", s)
-    s = re.sub(r"\s+", " ", s)
-    s = re.sub(r"\s+,", ",", s)
-    s = re.sub(r"^[\'\"]+\s?", "", s)
-    return s
+    from spacy import load
+    nlp = load("en_core_web_sm")
+
+    query = {"lt_matches.rule.id": rule_id}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                fixed = fix_verb_subject_agreement(parsed)
+            except (ValueError, IndexError):
+                continue
+            if fixed != doc["caption"]:
+                ops.append(
+                    UpdateOne(
+                        {"_id": doc["_id"]},
+                        {"$set": {"caption": fixed}},
+                    )
+                )
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
 
 
-def fix_tokens(s):
-    """Change typos in arbit tokens."""
-    typos = [(r"\bus\$", "USD"), (r"korea", "Korea")]
-    for pat, repl in typos:
-        s = re.sub(pat, repl, s)
-    return s
+def fix_top_two_plural_in_mongo(db="plotqa", collection="captions", chunksize=10_000):
+    """Fix 'The top two {metric} differ' by pluralizing the singular nsubj.
 
+    Uses spaCy to find the nominal subject of 'differ' and replaces
+    it with its plural form.
 
-def space_before_bracket(s):
-    return re.sub(r"(?P<prefix>\S)\(", r"\g<prefix> (", s)
-
-
-def missing_determiner(s, repl, offset, length):
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    chunksize : int
+        Number of documents to process per batch.
     """
-    Gambia, The
-    """
-    prefix = s[:offset]
-    suffix = s[(offset + length) :]
-    return prefix + repl + suffix
+    import inflect
+    from spacy import load
+    nlp = load("en_core_web_sm")
+    p = inflect.engine()
 
-
-def determiner_suffix_nnp(s):
-    """Fix proper nouns when determiners appear at the end, like:
-
-    United States of America, The
-    Czech Republic, The
-    """
-    return re.sub(r"(?P<nnp>.*), The", r"The \g<nnp>", s)
-
-
-def unpaired_symbol(s, sym):
-    count = s.count(sym)
-    if count > 0 and s.count(sym) % 2 == 0:
-        msg = f"Symbol {sym} is not unpaired in the sentence:\n" + s
-        raise ValueError(msg)
-    raise NotImplementedError
-
-
-def trim_leading_symbols(s, sym='"'):
-    count = s.count(sym)
-    if count > 0 and s.count(sym) % 2 == 0:
-        msg = f"Symbol {sym} is not unpaired in the sentence:\n" + s
-        raise ValueError(msg)
-    return re.sub(f"^\\s*{sym}\\s*", "", s)
-
-
-def fix(s):
-    s = fix_spaces(s)
-    s = fix_tokens(s)
-    return s
-
-
-def repeated_words(s):
-    """
-    in in 2008?
-    in in 2006 to ...
-    in in Ecuador
-    in in North America
-    Messed Up:
-        - Spain the -> Spain in the
-        - Benin
-        - Bahrain the
-        - Liechtenstein
-        - origin
-    """
-
-
-def fix_is_subject(s):
-    """
-    ('The verb form ‘is’ does not seem to match the subject ‘exports’.', 89),
-    ('The verb form ‘is’ does not seem to match the subject ‘savings’.', 19),
-    ('The verb form ‘is’ does not seem to match the subject ‘withdrawals’.', 17),
-    ('The verb form ‘is’ does not seem to match the subject ‘remittances’.', 9),
-    ('The verb form ‘is’ does not seem to match the subject ‘stocks’.', 5),
-    ('The verb form ‘differ’ does not seem to match the subject ‘rent’.', 4),
-    ('The verb form ‘does’ does not seem to match the subject ‘withdrawals’.', 2),
-    ('The verb form ‘does’ does not seem to match the subject ‘savings’.', 2),
-    ('The verb form ‘does’ does not seem to match the subject ‘payments’.', 2),
-    ('The verb form ‘differ’ does not seem to match the subject ‘education’.', 2),
-    ('The verb form ‘differ’ does not seem to match the subject ‘service’.', 2),
-    ('The verb form ‘differ’ does not seem to match the subject ‘rate’.', 2),
-    ('The verb form ‘differ’ does not seem to match the subject ‘ratio’.', 2),
-    ('The verb form ‘is’ does not seem to match the subject ‘payments’.', 1),
-    ('The verb form ‘does’ does not seem to match the subject ‘imports’.', 1),
-    ('The verb form ‘does’ does not seem to match the subject ‘remittances’.', 1),
-    ('The verb form ‘increases’ does not seem to match the subject ‘savings’.',
-     1),
-    ('The verb form ‘does’ does not seem to match the subject ‘flows’.', 1),
-    ('The verb form ‘does’ does not seem to match the subject ‘stocks’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘population’.',
-     1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘density’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘students’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘production’.',
-     1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘index’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘balance’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘force’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘student’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘birth’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘yield’.', 1),
-    ('The verb form ‘differ’ does not seem to match the subject ‘debt’.', 1),
-    ('The verb form ‘is’ does not seem to match the subject ‘flows’.', 1),
-    ('The verb form ‘is’ does not seem to match the subject ‘subscribers’.', 1)]
-    """
-
-
-def fix_determiner_superlative(doc):
-    """the
-    The highest population in   largest city across years is 200.
-                              ^ -------
-                              (superlative)
-    """
-    # If an adjective is superlative:
-    # If an adjective has a determiner, leave it alone.
-    # It it's conjunct noun has a determiner, leave it alone.
-    # If it has no determiner, but it's ancestor noun (to which the adj is amod) has one,
-    # leave it alone.
-    # otherwise add a determiner if it is supelative.
-
-
-def fix_one_plural(doc, nlp):
-    if not isinstance(doc, Doc):
-        doc = nlp(doc)
-    orgdoc = doc.copy()
-    edits = []
-    words = [t.text for t in orgdoc]
-    spaces = [bool(t.whitespace_) for t in doc]
-    # Find noun chunks
-
-    for chunk in orgdoc.noun_chunks:
-        if len(chunk) != 2:
-            continue
-        (cd, noun), tags = zip(*[(t, t.tag_) for t in chunk])
-        # If it is of the form "1 plural_form",
-        if tags == ("CD", "NNS"):
-            cd, noun = chunk
-            if cd.text == "1":
-                singular_noun = noun.lemma_
-                edits.append((noun.text, singular_noun))
-                new_chunk = cd.text, singular_noun
-                words[chunk.start : chunk.end] = new_chunk
-                doc = Doc(orgdoc.vocab, words=words, spaces=spaces)
-    return doc, edits
-
-
-def check():
-    with open("data/captions_1.json", "r") as fin:
-        captions = [k for k in json.load(fin) if k["caption"]]
-    unit = 1_000_000
-    n_slices = len(captions) // unit
-    remainder = len(captions) % unit
-    for i in tqdm(range(5, n_slices)):
-        gc.collect()
-        part = captions[(i * unit) : (i + 1) * unit]
-        res = Parallel(n_jobs=-1, verbose=2)(delayed(check_grammar)(**k) for k in part)
-        res = [k for k in res if k["matches"]]
-        with open(f"data/lt_results_{i}.json", "w") as fout:
-            json.dump(res, fout, indent=2)
-
-    remainder = captions[-remainder:]
-    res = Parallel(n_jobs=-1, verbose=2)(delayed(check_grammar)(**k) for k in remainder)
-    res = [k for k in res if k["matches"]]
-    with open("data/lt_results_final.json", "w") as fout:
-        json.dump(res, fout, indent=2)
-
-
-def draw_sample(path="data/qa_captions.json", size=10_000):
-    samples = []
-    for i, df in tqdm(
-        enumerate(
-            pd.read_json("data/qa_captions.json", lines=True, chunksize=1_000_000)
-        )
-    ):
-        xdf = df.sample(10_000)
-        res = Parallel(n_jobs=-1, verbose=2)(
-            delayed(check_grammar)(**r) for _, r in xdf.iterrows()
-        )
-        res = [c for c in res if len(c["matches"]) > 0]
-        samples.extend(res)
-    return samples
-
-
-def get_typos(data, pat="possible spelling mistake"):
-    T = []  # NOQA: N806
-    for k in data:
-        for match in k["matches"]:
-            sent = match["sentence"]
-            if pat.lower() in match["message"].lower():
-                start = match["offset"]
-                end = start + match["length"]
-                T.append(sent[start:end])
-    return set(T)
-
-
-def remove_error(data, pat):
-    for err in data:
-        newmatches = []
-        for match in err["matches"]:
-            msg = match["message"]
-            if pat.lower() not in msg.lower():
-                newmatches.append(match)
-        err["matches"] = newmatches
-    return data
+    query = {"lt_matches.rule.id": "SUBJECT_VERB_AGREEMENT"}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1}).batch_size(chunksize)
+        ops = []
+        for doc in tqdm(cursor, total=total):
+            try:
+                parsed = nlp(doc["caption"])
+                words = [t.text for t in parsed]
+                spaces = [bool(t.whitespace_) for t in parsed]
+                changed = False
+                for tok in parsed:
+                    if tok.text == "differ" and tok.dep_ == "ROOT":
+                        for child in tok.children:
+                            if child.dep_ == "nsubj" and child.tag_ == "NN":
+                                words[child.i] = p.plural(child.text)
+                                changed = True
+                                break
+                        break
+                if changed:
+                    fixed = Doc(parsed.vocab, words, spaces).text
+                    ops.append(
+                        UpdateOne(
+                            {"_id": doc["_id"]},
+                            {"$set": {"caption": fixed}},
+                        )
+                    )
+            except (ValueError, IndexError):
+                continue
+            if len(ops) >= chunksize:
+                coll.bulk_write(ops, ordered=False)
+                ops = []
+        if ops:
+            coll.bulk_write(ops, ordered=False)
 
 
 def get_repl_values(data):
@@ -416,8 +317,152 @@ def get_repl_values(data):
     return set(values)
 
 
+def _check_concatenated(docs):
+    """Concatenate captions, send as one LT request, and map matches back.
+
+    Parameters
+    ----------
+    docs : list[dict]
+        Each dict must have ``_id`` and ``caption``, and optionally
+        ``disabledRules`` (a list of LT rule IDs to suppress).
+
+    Returns
+    -------
+    dict
+        Mapping of ``_id`` to list of LT match objects (with offsets adjusted
+        to be relative to the individual caption).
+    """
+    # Build the concatenated text and an offset map.
+    # offsets[i] is the start position of docs[i] in the blob.
+    offsets = []
+    pos = 0
+    for doc in docs:
+        offsets.append(pos)
+        pos += len(doc["caption"]) + 1  # +1 for the newline separator
+
+    # Collect the union of all disabled rules across the batch
+    disabled = set()
+    for doc in docs:
+        disabled.update(doc.get("disabledRules") or [])
+
+    text = "\n".join(doc["caption"] for doc in docs)
+    params = {"language": "en-US", "text": text}
+    if disabled:
+        params["disabledRules"] = ",".join(disabled)
+    resp = get(URL, params=params)
+    if not resp.ok:
+        print(resp.text)  # NOQA: T201
+        raise ValueError(f"LT request failed with status {resp.status_code}")
+
+    # Assign each match to its caption using the global offset.
+    # bisect_right gives the index of the first offset > match_offset,
+    # so the caption index is one less.
+    result = {doc["_id"]: [] for doc in docs}
+    for match in resp.json()["matches"]:
+        global_offset = match["offset"]
+        idx = bisect_right(offsets, global_offset) - 1
+        doc_id = docs[idx]["_id"]
+        # Adjust offset to be relative to this caption
+        match["offset"] = global_offset - offsets[idx]
+        result[doc_id].append(match)
+
+    return result
+
+
+def check_and_store(db="plotqa", collection="captions", batch_size=1000, chunksize=10_000,
+                    query=None):
+    """Grammar-check captions in MongoDB and update each document with results.
+
+    Captions are concatenated into batches (newline-separated) before being
+    sent to the LanguageTool API. This is substantially faster than one
+    request per caption. Four batches are processed in parallel.
+
+    By default, finds documents that have a ``caption`` but no ``lt_matches``
+    yet. Pass a custom ``query`` to re-check specific documents, e.g.::
+
+        # Re-check only documents that had the CONSECUTIVE_SPACES error
+        check_and_store(query={"lt_matches.rule.id": "CONSECUTIVE_SPACES"})
+
+    Sets the following fields on each matched document::
+
+        {
+            "lt_matches": [            # list of LanguageTool match objects
+                {
+                    "message": <str>,
+                    "shortMessage": <str>,
+                    "replacements": [{"value": <str>, ...}, ...],
+                    "offset": <int>,       # relative to this caption
+                    "length": <int>,
+                    "context": {"text": <str>, "offset": <int>, "length": <int>},
+                    "sentence": <str>,
+                    "type": {"typeName": <str>},
+                    "rule": {
+                        "id": <str>,
+                        "description": <str>,
+                        "issueType": <str>,
+                        "category": {"id": <str>, "name": <str>},
+                    },
+                    "ignoreForIncompleteSentence": <bool>,
+                    "contextForSureMatch": <int>,
+                },
+                ...
+            ],
+            "n_errors": <int>,         # len(lt_matches), for convenient querying
+        }
+
+    Parameters
+    ----------
+    db : str
+        Name of the MongoDB database.
+    collection : str
+        Name of the MongoDB collection.
+    batch_size : int
+        Number of captions to concatenate per LT request.
+    chunksize : int
+        Number of documents to read from MongoDB per cursor batch.
+    query : dict, optional
+        Custom MongoDB query to select which documents to grammar-check.
+        Defaults to documents that have a caption but no lt_matches yet.
+    """
+    if query is None:  # Then do all
+        query = {"caption": {"$exists": True}}  # , "lt_matches": {"$exists": False}}
+    with MongoClient() as client:
+        coll = client[db][collection]
+        total = coll.count_documents(query)
+        cursor = coll.find(query, {"_id": 1, "caption": 1, "disabledRules": 1}).batch_size(chunksize)
+        chunk = []
+        for doc in tqdm(cursor, total=total):
+            chunk.append(doc)
+            if len(chunk) < chunksize:
+                continue
+            _check_chunk(chunk, coll, batch_size)
+            chunk = []
+        if chunk:
+            _check_chunk(chunk, coll, batch_size)
+
+
+def _check_chunk(chunk, coll, batch_size):
+    """Split a chunk into sub-batches, check in parallel, and write updates."""
+    # Split into sub-batches of batch_size
+    sub_batches = [
+        chunk[i : i + batch_size] for i in range(0, len(chunk), batch_size)
+    ]
+    # Process sub-batches in parallel (4 concurrent LT requests)
+    batch_results = Parallel(n_jobs=4, verbose=2)(
+        delayed(_check_concatenated)(sub) for sub in sub_batches
+    )
+    # Merge results and write to MongoDB
+    ops = []
+    for result in batch_results:
+        for doc_id, matches in result.items():
+            ops.append(
+                UpdateOne(
+                    {"_id": doc_id},
+                    {"$set": {"lt_matches": matches, "n_errors": len(matches)}},
+                )
+            )
+    coll.bulk_write(ops, ordered=False)
+
+
 if __name__ == "__main__":
-    df = pd.read_json('tid_2_captions.json', lines=True)
-    errors = Parallel(n_jobs=8, verbose=2)(delayed(check_grammar)(**r) for _, r in df.iterrows())
-    with open('tid_2_errors.json', 'w') as fout:
-        json.dump([e for e in errors if len(e['matches']) > 0], fout, indent=2)
+    check_and_store()

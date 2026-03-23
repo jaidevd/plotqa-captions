@@ -303,7 +303,10 @@
   regex: "Do a majority of the (?P<plural_xlabel>.*) between (?P<xvalue1>.*) and (?P<xvalue2>.*) (?P<adj>\\(inclusive\\)|\\(exclusive\\)) have (?P<ylabel>.*) greater than (?P<integer>.*) (?P<unit>.*)\\s?\\?$"
     # Counterexamples
     # Do a majority of the years between 2005 and 2002 (inclusive) have enrollments in private institutions greater than 5.8 % ?
-  template_header: ""
+  template_header: "{% set groups = plural_xlabel %}
+                    {% set range = f'between {xvalue1} and {xvalue2} {adj}' %}
+                    {% set metric = ylabel %}
+                    {% set threshold = f'{integer} {unit}' %}"
   caption_templates: captions.randomize_40
   type: "binary"
 - id: 41
@@ -332,14 +335,15 @@
     - "The difference between {{ X }} and {{ Y }} in year {{ year }} is {{ answer }}."
   type: "retrieval"
 - id: 44
-  regex: "What is the difference between the (?P<ylabel1>.*) (?P<preposition1>of|in) (?P<legendlabel1>.*) and (?P<ylabel2>.*) (?P<preposition2>of|in) (?P<legendlabel2>.*) in (?P<xvalue>.*)\\s?\\?$"
+  regex: "What is the difference between the (?P<ylabel1>.*) (?P<preposition1>of|in) (?P<legendlabel1>.*) and (?!that in)(?P<ylabel2>.*) (?P<preposition2>of|in) (?P<legendlabel2>.*) in (?P<xvalue>.*)\\s?\\?$"
   template_header: "{% set X = f'{ylabel1} {preposition1} {legendlabel1}' %}
                     {% set Y = f'{ylabel2} {preposition2} {legendlabel2}' %}"
   caption_templates: captions.randomize_44
   type: "retrieval"
 - id: 45
   regex: "Is the difference between the (?P<metric1>.*) in (?P<group1>.*) and (?P<group2>.*) greater than the difference between the (?P<metric2>.*) in (?P<group3>.*) and (?P<group4>.*)\\s?\\?$"
-  template_header: ""
+  template_header: "{% set X = metric1 %}
+                    {% set Y = metric2 %}"
   caption_templates: captions.randomize_45
   type: "binary"
 - id: 46
