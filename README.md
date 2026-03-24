@@ -157,13 +157,13 @@ If you use this dataset, please cite both PlotCaptions and the original PlotQA p
   url       = {https://github.com/jaidevd/plotqa-captions}
 }
 
-@inproceedings{methani2020plotqa,
-  title     = {PlotQA: Reasoning over Scientific Plots},
-  author    = {Methani, Nitesh and Ganguly, Pritha and Khapra, Mitesh M. and Kumar, Pratyush},
-  booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
-  year      = {2020},
-  pages     = {1527--1536}
-}
+@InProceedings{Methani_2020_WACV,
+author = {Methani, Nitesh and Ganguly, Pritha and Khapra, Mitesh M. and Kumar, Pratyush},
+title = {PlotQA: Reasoning over Scientific Plots},
+booktitle = {The IEEE Winter Conference on Applications of Computer Vision (WACV)},
+month = {March},
+year = {2020}
+} 
 ```
 
 ## License
