@@ -137,3 +137,4 @@ data/mongo/*
 
 *.json
 *.jsonl
+data/pngs/*.png
