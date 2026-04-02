@@ -12,10 +12,14 @@ COLL = CLIENT["plotqa"]["captions"]
 PNG_DIR = os.path.join(os.path.dirname(__file__), os.pardir, "data", "pngs")
 
 
-def _random_doc(max_tries=10):
+def _random_doc(match_filter=None, max_tries=10):
     """Return a random document that hasn't been reviewed yet."""
+    pipeline = []
+    if match_filter:
+        pipeline.append({"$match": match_filter})
+    pipeline.append({"$sample": {"size": 1}})
     for _ in range(max_tries):
-        docs = list(COLL.aggregate([{"$sample": {"size": 1}}]))
+        docs = list(COLL.aggregate(pipeline))
         if not docs:
             return None
         if "qa_ok" not in docs[0]:
@@ -45,7 +49,14 @@ def api_caption(doc_id=None):
         if doc is None:
             return jsonify({"error": "Document not found"}), 404
     else:
-        doc = _random_doc()
+        match_filter = {}
+        qcat = request.args.get("qcat")
+        qtype = request.args.get("type")
+        if qcat:
+            match_filter["question_category"] = qcat
+        if qtype:
+            match_filter["type"] = qtype
+        doc = _random_doc(match_filter or None)
         if doc is None:
             return jsonify({"error": "No documents found"}), 404
     return jsonify(_serialize(doc))

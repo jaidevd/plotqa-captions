@@ -160,7 +160,7 @@
       document.getElementById('btn-incorrect').disabled = false;
 
       try {
-        const res = await fetch('/api/caption');
+        const res = await fetch('/api/caption' + window.location.search);
         if (!res.ok) throw new Error('Failed to fetch');
         currentDoc = await res.json();
 
@@ -192,6 +192,13 @@
         status.textContent = `Marked as ${verdict}`;
         status.className = `status show ${verdict === 'correct' ? 'ok' : 'fail'}`;
 
+        const qcats = ['comparison', 'min_max'];
+        const types = ['hbar', 'vbar'];
+        const params = new URLSearchParams({
+          qcat: qcats[Math.floor(Math.random() * qcats.length)],
+          type: types[Math.floor(Math.random() * types.length)],
+        });
+        history.replaceState(null, '', '?' + params.toString() + window.location.hash);
         setTimeout(loadNext, 800);
       } catch (e) {
         status.textContent = 'Error saving verdict';
